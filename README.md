@@ -1,196 +1,186 @@
-# MCP Weather Server
+# MCP Learning Server
 
-[![npm version](https://img.shields.io/npm/v/@timlukahorstmann/mcp-weather)](https://www.npmjs.com/package/@timlukahorstmann/mcp-weather)
-[![license](https://img.shields.io/github/license/TimLukaHorstmann/mcp-weather)](https://github.com/TimLukaHorstmann/mcp-weather/blob/main/LICENSE)
-[![node version](https://img.shields.io/node/v/@timlukahorstmann/mcp-weather)](https://www.npmjs.com/package/@timlukahorstmann/mcp-weather)
-[![issues](https://img.shields.io/github/issues/TimLukaHorstmann/mcp-weather)](https://github.com/TimLukaHorstmann/mcp-weather/issues)
-[![weekly downloads](https://img.shields.io/npm/dm/@timlukahorstmann/mcp-weather)](https://www.npmjs.com/package/@timlukahorstmann/mcp-weather)
-[![Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/TimLukaHorstmann/mcp-weather)](https://archestra.ai/mcp-catalog/timlukahorstmann__mcp-weather)
+A Python MCP project that connects Gemini to course-learning database tools and
+external APIs through stdio and Streamable HTTP transports.
 
-<p align="center">
-  <img src="logo.png" alt="MCP Weather Server Logo" width="250"/>
-  <a href="https://glama.ai/mcp/servers/@TimLukaHorstmann/mcp-weather">
-    <img width="380" height="200" src="https://glama.ai/mcp/servers/@TimLukaHorstmann/mcp-weather/badge" alt="Weather MCP server" />
-  </a>
-</p>
+## Requirements
 
-A Model Context Protocol (MCP) server that provides hourly and daily weather forecasts using the AccuWeather API.
+- Python 3.11 or newer
+- PostgreSQL with the `courses` and `lessons` tables
+- A Gemini API key for the example clients
+- [uv](https://docs.astral.sh/uv/) for environment and dependency management
 
----
+## Installation
 
-## Quick Start
+Install `uv` if it is not already installed:
 
-You need an AccuWeather API key (free tier available).  
-[Sign up here](https://developer.accuweather.com/) and create an app to get your key.
-
-Export your API key as an environment variable:
-
-```bash
-export ACCUWEATHER_API_KEY=your_api_key_here
+```powershell
+pip install uv
 ```
 
-Then run the MCP Weather server directly with:
+Clone the repository and enter the project directory:
 
-```bash
-npx -y @timlukahorstmann/mcp-weather
+```powershell
+git clone <repository-url>
+cd mcp-weather
 ```
 
-Or, for HTTP/REST access via [supergateway](https://github.com/supercorp-ai/supergateway):
+Create the virtual environment and install the locked dependencies:
 
-```bash
-npx -y supergateway --stdio "npx -y @timlukahorstmann/mcp-weather" \
-  --port 4004 \
-  --baseUrl http://127.0.0.1:4004 \
-  --ssePath /messages \
-  --messagePath /message \
-  --cors "*" \
-  --env ACCUWEATHER_API_KEY="$ACCUWEATHER_API_KEY"
+```powershell
+uv sync
 ```
 
----
+`uv sync` reads `pyproject.toml`, uses `uv.lock`, and creates `.venv`
+automatically. You do not need to activate the virtual environment when using
+`uv run`.
 
-## MCP Server Config Example
+## Environment configuration
 
-For integration with Claude Desktop or other MCP-compatible clients, add this to your config (e.g. `claude_desktop_config.json`):
+Create a `.env` file in the project root:
 
-```json
-{
-  "mcpServers": {
-    "weather": {
-      "command": "npx",
-      "args": ["-y", "@timlukahorstmann/mcp-weather"],
-      "env": {
-        "ACCUWEATHER_API_KEY": "your_api_key_here"
-      }
-    }
-  }
-}
+```env
+GEMINI_API_KEY=your_gemini_api_key
+
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=your_database
+DB_USER=your_user
+DB_PASSWORD=your_password
+
+# Optional GitHub authentication for higher API rate limits
+GITHUB_TOKEN=your_github_token
+
+# Optional REST Countries token; the demo value is used by default
+REST_COUNTRIES_TOKEN=rc_live_demo
 ```
 
----
+The database tools require a reachable PostgreSQL database with these tables:
 
-## Overview
+- `courses`: course ID, title, category, and difficulty.
+- `lessons`: lesson ID, course ID, title, duration, and completion status.
 
-This MCP server allows large language models (like Claude) to access real-time weather data. When integrated with an LLM, it enables the model to:
+`.env` is ignored by Git. Never commit API keys, database passwords, or other
+secrets.
 
-- Fetch accurate, up-to-date weather forecasts
-- Provide hourly weather data for the next 12 hours
-- Access daily weather forecasts for up to 15 days
-- Display data in both metric (°C) and imperial (°F) units
-- View temperature, conditions, precipitation information, and other weather details
+## Project structure
 
-## Available Tools
+```text
+src/mcp_learning/
+├── clients/
+│   ├── http_client.py       # Gemini client for the HTTP MCP server.
+│   └── stdio_client.py      # Gemini client that launches the stdio server.
+├── servers/
+│   ├── http/server.py       # Streamable HTTP MCP server on port 8000.
+│   └── stdio/server.py      # Local MCP server over standard input/output.
+└── tools/
+    ├── db_tools.py          # PostgreSQL course and lesson operations.
+    └── tools.py             # Async weather, Wikipedia, GitHub, and country APIs.
+```
 
-### Hourly Weather Forecast
-- Tool name: `weather-get_hourly`
-- Provides hourly forecasts for the next 12 hours
-- Parameters:
-  - `location` (required): City or location name
-  - `units` (optional): "metric" (Celsius, default) or "imperial" (Fahrenheit)
+## Available MCP tools
 
-### Daily Weather Forecast
-- Tool name: `weather-get_daily`
-- Provides daily forecasts for up to 15 days
-- Parameters:
-  - `location` (required): City or location name
-  - `days` (optional): Number of forecast days (1, 5, 10, or 15; default is 5)
-  - `units` (optional): "metric" (Celsius, default) or "imperial" (Fahrenheit)
+### Course and lesson tools
 
-## Prerequisites
+Database-backed operations for managing courses, lessons, and learning
+progress:
 
-- Node.js ≥18  
-- An AccuWeather API key (set via `.env` or your shell)
+- `get_courses` — list all courses.
+- `find_courses` — search courses by title, category, or difficulty.
+- `fetch_course` — retrieve one course by ID.
+- `create_course` — create a course.
+- `edit_course` — update selected course fields.
+- `remove_course` — delete a course after confirmation.
+- `fetch_lessons` — list lessons for a course.
+- `complete_lesson` — mark a lesson complete or incomplete.
+- `fetch_learning_progress` — show progress for every course.
 
-## Setup
+### External API tools
 
-1. **Clone this repository:**
-   ```bash
-   git clone https://github.com/TimLukaHorstmann/mcp-weather.git
-   cd mcp-weather
-   ```
+Async HTTP tools that return compact structured results from public APIs:
 
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+- `get_weather` — get current weather for a city using Open-Meteo.
+- `get_weather_forecast` — get a 1–7 day forecast using Open-Meteo.
+- `search_wikipedia` — search English Wikipedia articles.
+- `get_wikipedia_summary` — retrieve a plain-text article introduction.
+- `search_github_repositories` — search public GitHub repositories.
+- `get_github_repository` — retrieve public repository details.
+- `get_github_issues` — list open issues while excluding pull requests.
+- `get_country_info` — retrieve country details from REST Countries.
+- `search_countries` — search countries by free-text query.
 
-3. **Get an AccuWeather API key:**
-   - Register at [AccuWeather API](https://developer.accuweather.com/)
-   - Create a new app and obtain an API key
+## Servers and clients
 
-4. **Create a `.env` file with your API key:**
-   ```
-   ACCUWEATHER_API_KEY=your_api_key_here
-   ```
+### Stdio
 
-5. **Build the project:**
-   ```bash
-   npm run build
-   ```
+The stdio server communicates over the process's standard input and output.
+The stdio client starts that server automatically, so only one command is
+required:
 
-## Usage with Claude Desktop
+```powershell
+uv run python -m mcp_learning.clients.stdio_client
+```
 
-1. Configure Claude Desktop to use this MCP server:
-   - Open Claude Desktop
-   - Go to Settings > Developer > Edit Config
-   - Add the following to your `claude_desktop_config.json`:
+Use this mode for local MCP integrations where the client launches the server
+as a child process.
 
-   ```json
-   {
-     "mcpServers": {
-       "weather": {
-         "command": "npx",
-         "args": ["-y", "@timlukahorstmann/mcp-weather"],
-         "env": {
-           "ACCUWEATHER_API_KEY": "your_api_key_here"
-         }
-       }
-     }
-   }
-   ```
+### Streamable HTTP
 
-2. Restart Claude Desktop
+The HTTP server runs as a separate web service at
+`http://127.0.0.1:8000/mcp`. Start it in one terminal:
 
-3. In a new conversation, enable the MCP server by clicking the plug icon and selecting "weather"
+```powershell
+uv run python -m mcp_learning.servers.http.server
+```
 
-4. Now you can ask Claude for weather forecasts, such as:
-   - "What's the hourly weather forecast for New York City?"
-   - "Give me the 5-day forecast for London."
-   - "What will the weather be like in Tokyo this week in Fahrenheit?"
-   - "Will it rain in San Francisco tomorrow?"
+Then start the HTTP Gemini client in a second terminal:
 
-## Development
+```powershell
+uv run python -m mcp_learning.clients.http_client
+```
 
-- Install dev dependencies: `npm install`
-- Lint your code:           `npm run lint`  
-- Build:                    `npm run build`  
-- Run tests:                `npm test`
-- Start in dev mode:        `npm run dev`
+Use this mode when multiple clients or remote HTTP-capable MCP integrations
+need to connect to the same running server.
 
-## Contributing
+### Transport comparison
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+| Feature | Stdio | Streamable HTTP |
+| --- | --- | --- |
+| Connection | Process pipes | HTTP endpoint |
+| Server startup | Client starts it automatically | Started separately |
+| Client terminals | One command | Server and client terminals |
+| Best for | Local single-client use | Shared or HTTP-based clients |
+| Endpoint | None | `http://127.0.0.1:8000/mcp` |
 
-## Future Enhancements
+Type `exit` in either interactive client to close it.
 
-We're always looking to improve the MCP Weather Server. Here are some features we're considering for future releases:
+## Testing and validation
 
-- **Extended Hourly Forecasts:** Beyond 12 hours, e.g., 24 or 48 hours.
-- **Weather Alerts:** Integration with AccuWeather's severe weather alerts API.
-- **Location Autocomplete:** Improved location searching with autocomplete suggestions.
-- **Historical Weather Data:** Access to past weather conditions.
+Run the test suite:
 
-If you have ideas for other features, feel free to open an issue!
+```powershell
+uv run pytest tests
+```
 
-## Changelog
+Compile the application modules:
 
-### 0.4.0
-- Removed `sessionId` requirement from all tools as it was not used for anything internally
-- This simplifies integrations and reduces confusion for LLM usage
+```powershell
+uv run python -m py_compile `
+  src\mcp_learning\tools\tools.py `
+  src\mcp_learning\tools\db_tools.py `
+  src\mcp_learning\servers\http\server.py `
+  src\mcp_learning\servers\stdio\server.py
+```
 
-### 0.3.0 and earlier
-- Initial releases with basic functionality
+## Useful example questions
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+- `What's the current weather in Bengaluru?`
+- `Give me the 5-day weather forecast for Mumbai.`
+- `Search Wikipedia for Model Context Protocol.`
+- `Summarize the Wikipedia article about Python.`
+- `Search GitHub for MCP servers written in Python.`
+- `Show details for the owner/repository repository.`
+- `List open issues in the owner/repository repository.`
+- `Give me information about India.`
+- `Search for countries matching United.`
+- `Show my learning progress.`

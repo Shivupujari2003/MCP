@@ -1,0 +1,25 @@
+[project]
+name = "mcp-learning"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Shivupujari2003", email = "shivu.kp.333@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "google-genai>=2.31.0",
+    "httpx>=0.28.1",
+    "mcp[cli]>=1,<2",
+    "psycopg-pool>=3.3.3",
+    "psycopg[binary]>=3.3.6",
+    "pytest>=9.1.1",
+    "python-dotenv>=1.2.4",
+]
+
+[project.scripts]
+mcp = "mcp:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
